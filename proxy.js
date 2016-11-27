@@ -17,7 +17,13 @@ var proxy = net.createServer(function (socket) {
  
     // 2-way pipe between client and TCP server
     socket.pipe(client).pipe(socket);
- 
+
+    server.listen(9020, function () {
+        var port = server.address().port;
+        console.log('HTTP(s) proxy server listening on port %d', port);
+    });
+
+
     socket.on('close', function () {
         console.log('Client disconnected from proxy');
     });
