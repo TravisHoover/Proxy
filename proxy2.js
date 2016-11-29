@@ -2,10 +2,8 @@ var http = require('http');
 var url  = require('url');
 var util = require('util');
 var zlib = require('zlib');
-var gunzip = zlib.createGunzip();
 
 var nc  = require('ncurses');
-//var StringDecoder = require('StringDecoder');
 var fs = require('fs');
 
 var spaces_b200 = new Buffer(200); spaces_b200.fill(" ");
@@ -26,8 +24,6 @@ var server = http.createServer(function(request, response) {
     proxy_options.host = request_url.hostname;
     proxy_options.port = request_url.port || 80;
 
-
-
     var spaces = new Buffer(90); spaces.fill(' ');
     var request_url_substr = (request.url + spaces ).substr(0,90);
     request.id = "request_id_" + ( request_id_next++ );
@@ -39,8 +35,6 @@ var server = http.createServer(function(request, response) {
         'progress'   : '' ,
         'timeout'   : ''
     };
-
-
 
     if ( request_url.path.match(/(jquery\.min\.js)/) ) {
         var file_data = fs.readFileSync('www/jquery.min.js' );
@@ -92,19 +86,12 @@ var server = http.createServer(function(request, response) {
             response.writeHead(proxy_response.statusCode, proxy_response.headers);
         }
 
-
-
-
         var len = parseInt(proxy_response.headers['content-length'], 10);
         var cur = 0;
 
-        // there could be optimization to grab javascripts already from
-        // chunks, and reinsert them at the on('end'), but its quite complicated
-        // because a string can be split up in 2 chunks... load full buffer for now.
         proxy_response.on('data', function(chunk){
             if ( is_text ) {
                 mybuffer += chunk.toString('binary') ;
-                //buffers.push( chunk );
             } else {
                 response.write(chunk,'binary');
             }
@@ -122,42 +109,22 @@ var server = http.createServer(function(request, response) {
             }
         });
 
-
-
         proxy_response.on('end', function() {
             if ( is_text  ) {
 
-
-                // workaround: to get multiline regex we convert nl to uffff and back
-                //buffers_all = Buffer.concat( buffers );
-                //var decoder = new StringDecoder('utf8');
-                //output = decoder.write( buffers_all ).toString('utf8');
-
                 output = mybuffer.toString();
 
-                // decode if it is gzip
-                //output = gunzip.write( mybuffer );
-
                 output = output.replace(/\n/g,'\uffff');
-                //output = decoder.write(mybuffer).replace(/\n/g,'\uffff');
-
 
                 // find javascripts
                 matches = output.match(/\<script.*?\<\/script\>/gi ) || [];
 
-
                 var lazyscript = "<!-- INSERT LAZY -->";
                 if ( !output.match( /lazyload\.js/gi ) && !output.match( /lazyload\.min\.js/gi ) ){
 
-                    //output = output.replace( /\<img(.*?) src\=\"\/(.*?)\"/gi , '<img class="lazy" $1 data-original="http://src.sencha.io/640/http://'+ request_url.hostname + '/$2" src="/nodeajaxloader.gif"' );
                     output = output.replace( /\<img(.*?) src\=\"\/(.*?)\"/gi , '<img class="lazy" $1 data-original="$2" src="/nodeajaxloader.gif"' );
-                    //output = output.replace( /\<img(.*?) src\=\"http(.*?)\"/gi , '<img class="lazy" $1 data-original="http://src.sencha.io/640/http$2" src="/nodeajaxloader.gif"' );
                     output = output.replace( /href\=\"http:\/\/i.imgur.com(.*?)\"/gi , 'href="http://src.sencha.io/jpg20/640/http://i.imgur.com$1"' );
 
-                    //output = output.replace( /\<img(.*?) src\=\"(.*?)\"/gi , '<img class="lazy" $1 data-original="$2" src="/nodeajaxloader.gif"' );
-
-
-                    //request_url.path
 
                     if ( !output.match( /jquery(.*?)\.min\.js/gi ) ){
                         lazyscript += '<script src="/jquery.min.js" ></script>';
@@ -165,7 +132,6 @@ var server = http.createServer(function(request, response) {
                     lazyscript += '<script src="/jquery.lazyload.min.js" ></script>';
                     lazyscript += '<script>$("img.lazy").lazyload({ threshold : 200 ,effect : "fadeIn",failure_limit : 100 }) </script>';
                 }
-                //response.write( lazyscript );
 
                 if( matches.length >= 0 && output.match(/\<\/body\>/i) /* google redirects with missing body */) {
                     // remove javascripts
@@ -178,11 +144,9 @@ var server = http.createServer(function(request, response) {
                 // send to browser
                 output = output.replace(/\uffff/g,'\n');
 
-
                 proxy_response.headers['content-length'] = output.length;
                 response.writeHead(proxy_response.statusCode, proxy_response.headers);
 
-                //response.write( buffers_all );
                 response.write( output ,'binary');
 
             }
@@ -195,7 +159,6 @@ var server = http.createServer(function(request, response) {
         requests_data[request.id].error  = e.message ;
     }).on('close' , function() {
         requests_data[request.id].status="closed";
-        //POST ?
         if ( proxy_request ) {
             proxy_request.end();
 
@@ -205,7 +168,7 @@ var server = http.createServer(function(request, response) {
         //console.log('sent post data');
         requests_data[request.id].status="ended";
         proxy_request.end();
-    })
+    });
 
     request.on('data', function(chunk) {
         requests_data[request.id].status="up data";
@@ -229,8 +192,6 @@ var server = http.createServer(function(request, response) {
     console.log('got server error with' + e.message );
 });
 
-// set to 0 if you want to turn off ncurses display-refresh,
-// change refreshtimer in setInterval (default 1000 = 1seconds)
 if ( 1 ) {
     // provide logging
     var win = new nc.Window();
@@ -244,23 +205,19 @@ if ( 1 ) {
             var ln = 1;
             var nc_lines = nc.lines;
 
-            //for ( ln = 0; ln < Object.keys(requests_data).length ; ln++ ){
-            win.addstr(0,1, "proxy server 8080 :" + (log_counter/60.0).toFixed(1) + "m " /*+ (ln -1 )+" connections   "*/);
-            //win.addstr(0,30, "status" + requests_status );
+            win.addstr(0,1, "proxy server 8080 :" + (log_counter/60.0).toFixed(1) + "m ");
 
             for ( key in requests_data ){
                 var request_data = requests_data[key];
 
                 ln++;
-                //if ( ln <= nc_lines + 2) {
-                //win.addstr( ln , 0 , log_counter +"" );
+
                 win.addstr( ln , 0 , (request_data['url'] +"").substr(0,70) );
                 win.addstr( ln , 77, (request_data['timeout' ]+"      ").substr(0,3) );
                 win.addstr( ln , 80, (request_data['status' ]+"        ").substr(0,6) );
                 win.addstr( ln , 75, (request_data['is_text' ]+" ").substr(0,1) );
                 win.addstr( ln , 90, (request_data['progress']+"                ").substr(0,16) );
-                win.refresh(); // due to bug in osx+terminal+ncurses we need to refresh often.
-                //}
+                win.refresh();
 
                 if ( (requests_data[key]['status']+"").match(/(closed|ended|error)/) ){
 
@@ -271,9 +228,7 @@ if ( 1 ) {
                         requests_data[key]['timeout'] -= 1;
                     }
                     if ( (requests_data[key]['timeout']+"" ) == "0" ){
-                        //request_data = requests_data[key] ;
                         delete requests_data[key];
-                        //requests_data[key] = request_data;
                     }
                 }
             }
